@@ -104,9 +104,11 @@ class BBoxReactiveController(object):
     def __init__(self):
         rospy.init_node('bbox_reactive_controller')
 
-        self.vx_pid = PID(kp=3, ki=0, deriv_prediction_dt=0.3, max_deriv_noise_gain=3)
-        self.yaw_pid = PID(kp=3, ki=0, deriv_prediction_dt=0.3, max_deriv_noise_gain=3)
-        self.pitch_pid = PID(kp=3, ki=0, deriv_prediction_dt=0.3, max_deriv_noise_gain=3)
+        self.surge_pid = PID(kp=3, ki=0, deriv_prediction_dt=0.3, max_deriv_noise_gain=3) # surge
+        self.heave_pid = PID(kp=3, ki=0, deriv_prediction_dt=0.3, max_deriv_noise_gain=3) # heave
+        self.yaw_pid = PID(kp=3, ki=0, deriv_prediction_dt=0.3, max_deriv_noise_gain=3) # yaw
+        self.roll_pid = PID(kp=3, ki=0, deriv_prediction_dt=0.3, max_deriv_noise_gain=3) # roll
+        self.sway_pid = PID(kp=3, ki=0, deriv_prediction_dt=0.3, max_deriv_noise_gain=3) # sway
         self.params_map = {}
         self.set_pid_params()
 
@@ -165,10 +167,10 @@ class BBoxReactiveController(object):
 	#print (self.params_map['flat_yaw_kp'], self.params_map['flat_yaw_ki'], self.params_map['flat_yaw_deriv_prediction_dt'])
 	
 
-        self.params_map['flat_pitch_kp'] = rospy.get_param('~flat_pitch_kp')
-        self.params_map['flat_pitch_ki'] = rospy.get_param('~flat_pitch_ki')
-        self.params_map['flat_pitch_deriv_prediction_dt'] = rospy.get_param('~flat_pitch_deriv_prediction_dt')
-        self.params_map['flat_pitch_max_deriv_noise_gain'] = rospy.get_param('~flat_pitch_max_deriv_noise_gain')
+        self.params_map['flat_sway_kp'] = rospy.get_param('~flat_sway_kp')
+        self.params_map['flat_sway_ki'] = rospy.get_param('~flat_sway_ki')
+        self.params_map['flat_sway_deriv_prediction_dt'] = rospy.get_param('~flat_sway_deriv_prediction_dt')
+        self.params_map['flat_sway_max_deriv_noise_gain'] = rospy.get_param('~flat_sway_max_deriv_noise_gain')
 
         self.params_map['magnify_speed'] = rospy.get_param('~magnify_speed')
         self.params_map['deadzone_abs_vel_error'] = rospy.get_param('~deadzone_abs_vel_error')
@@ -177,13 +179,16 @@ class BBoxReactiveController(object):
         self.params_map['target_bbox_image_ratio'] = rospy.get_param('~target_bbox_image_ratio')
         self.params_map['sec_before_giving_up'] = rospy.get_param('~sec_before_giving_up')
 
-        self.vx_pid.set_params(self.params_map['flat_vel_kp'], self.params_map['flat_vel_ki'], 
+        self.surge_pid.set_params(self.params_map['flat_vel_kp'], self.params_map['flat_vel_ki'], 
 			       self.params_map['flat_vel_deriv_prediction_dt'], self.params_map['flat_vel_max_deriv_noise_gain'])
         self.yaw_pid.set_params(self.params_map['flat_yaw_kp'], self.params_map['flat_yaw_ki'], 
 			       self.params_map['flat_yaw_deriv_prediction_dt'], self.params_map['flat_yaw_max_deriv_noise_gain'])
-        self.pitch_pid.set_params(self.params_map['flat_pitch_kp'], self.params_map['flat_pitch_ki'], 
-			       self.params_map['flat_pitch_deriv_prediction_dt'], self.params_map['flat_pitch_max_deriv_noise_gain'])
-            
+        self.sway_pid.set_params(self.params_map['flat_sway_kp'], self.params_map['flat_sway_ki'], 
+			       self.params_map['flat_sway_deriv_prediction_dt'], self.params_map['flat_sway_max_deriv_noise_gain'])
+        self.heave_pid.set_params(self.params_map['flat_vel_kp'], self.params_map['flat_vel_ki'], 
+			       self.params_map['flat_vel_deriv_prediction_dt'], self.params_map['flat_vel_max_deriv_noise_gain'])
+        self.roll_pid.set_params(self.params_map['flat_yaw_kp'], self.params_map['flat_yaw_ki'], 
+			       self.params_map['flat_yaw_deriv_prediction_dt'], self.params_map['flat_yaw_max_deriv_noise_gain'])     
    
             
     def compute_errors_from_estimate(self): 
@@ -239,31 +244,31 @@ class BBoxReactiveController(object):
 
         if bbox_filter_is_active:
             ss, yy, pp, rr, hh = 0, 0, 0, 0, 0
-            error_forward, error_yaw, error_pitch = self.compute_errors_from_estimate()
+            error_forward, error_yaw, error_heave = self.compute_errors_from_estimate()
             #print (error_forward, error_yaw,  error_pitch)
     
-            self.vx_pid.update(error_forward, now.to_sec())
+            self.surge_pid.update(error_forward, now.to_sec())
             self.yaw_pid.update(error_yaw, now.to_sec())
-            self.pitch_pid.update(error_pitch, now.to_sec())
+            self.heave_pid.update(error_heave, now.to_sec())
 
-            if self.vx_pid.is_initialized(): # forward pseudospeed
-                ss = self._clip(self.vx_pid.control-self.params_map['target_bbox_image_ratio'], 0, 1)  
+            if self.surge_pid.is_initialized(): # forward pseudospeed
+                ss = self._clip(self.surge_pid.control-self.params_map['target_bbox_image_ratio'], 0, 1)  
                 if ss <= self.params_map['deadzone_abs_vel_error']:
                     ss = 0.0 
         else: 
             ss = self._clip(self.params_map['magnify_speed']*ss, 0, 1)  
 
-            if self.yaw_pid.is_initialized(): # yaw pseudospeed
-                yy = self._clip(self.yaw_pid.control, -1, 1)
+        if self.yaw_pid.is_initialized(): # yaw pseudospeed
+            yy = self._clip(self.yaw_pid.control, -1, 1)
         if abs(yy) <= self.params_map['deadzone_abs_yaw_error']:
                     yy = 0.0           
 
-        if self.pitch_pid.is_initialized(): # pitch pseudospeed         
-            pp = self._clip(self.pitch_pid.control, -1, 1) 
-        if abs(pp) <= self.params_map['deadzone_abs_pitch_error']:
-            pp = 0.0
+        if self.heave_pid.is_initialized(): # pitch pseudospeed         
+            hh = self._clip(self.heave_pid.control, -1, 1) 
+        if abs(hh) <= self.params_map['deadzone_abs_pitch_error']:
+            hh = 0.0
 
-            print ('V, yaw, pitch : ', (ss, yy,  pp) )
+            print ('V, yaw, heave : ', (ss, yy,  hh) )
             self.set_vyprh_cmd(ss, yy, pp, rr, hh)
 
         else:
@@ -279,8 +284,8 @@ class BBoxReactiveController(object):
         self.cmd_msg.throttle = ss+0.2
         self.cmd_msg.yaw = yy
         self.cmd_msg.pitch = pp
-        #self.cmd_msg.roll = rr
-        #self.cmd_msg.heave = hh
+        self.cmd_msg.roll = rr
+        self.cmd_msg.heave = hh
         
 
 
