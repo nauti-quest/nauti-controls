@@ -21,7 +21,7 @@
 import rospy
 from mini_pilot.msg import Command
 from std_msgs.msg import Float32
-from target_following.msg import TargetObservation, TargetObservations
+from nauti_controls.msg import TargetObservation
 
 from math import pi, sqrt, exp, log, tanh, cos, sin
 from threading import Lock
@@ -39,7 +39,9 @@ from pid import PID
 
 	 -- Xahid 03.27.2018
 """
-
+# false positives avoidance - use probability
+OBJECTS_OF_INTEREST = {"traffic_cone", "belgian_gate"}
+THRESHOLD = 0.6
 
 # Provides helper functions for BBox object
 class BBoxFilter(object):
@@ -71,31 +73,31 @@ class BBoxFilter(object):
         self.last_measurement = None
         
     def is_initialized(self):
-        return self.last_measurement is not None
+        return (self.last_measurement is not None 
+        and self.last_measurement.class_name in OBJECTS_OF_INTEREST 
+        and self.last_measurement.class_prob >= THRESHOLD)
 
     def still_tracking(self, thr):
-        assert (self.is_initialized())
         return (rospy.Time.now() - self.last_measurement.header.stamp).to_sec() < thr
     
     def get_bbox(self):
         return self.state[0:4] * np.array([self.img_cols, self.img_rows, self.img_cols, self.img_rows])
     
     def update_estimate(self, measurement):
-        assert measurement.target_visible
-        
-        self.last_measurement = measurement
-        self.last_measurement.header.stamp = rospy.Time.now()
-            
-        z = np.array([self.last_measurement.top_left_x / self.img_cols,
-                      self.last_measurement.top_left_y / self.img_rows,
-                      self.last_measurement.width / self.img_cols,
-                      self.last_measurement.height / self.img_rows]) 
+        if measurement.target_visible:
+            self.last_measurement = measurement
+            self.last_measurement.header.stamp = rospy.Time.now()
+                
+            z = np.array([self.last_measurement.top_left_x / self.img_cols,
+                        self.last_measurement.top_left_y / self.img_rows,
+                        self.last_measurement.width / self.img_cols,
+                        self.last_measurement.height / self.img_rows]) 
 
-        if (not self.is_initialized()):
-            self.state[0:4] = z
-            return
-        
-        self.state[0:4] = 0.*self.state[0:4] + 1.*z 
+            if (not self.is_initialized()):
+                self.state[0:4] = z
+                return
+            
+            self.state[0:4] = 0.*self.state[0:4] + 1.*z 
         
         
 
@@ -122,10 +124,10 @@ class BBoxReactiveController(object):
         self.rate = 20 
 
         print ("Waiting for /target/observation to come up")
-        rospy.wait_for_message('/target/observation', TargetObservations)
+        rospy.wait_for_message('/target/observation', TargetObservation)
         print ("/target/observation has come up")
         
-        self.observation_sub = rospy.Subscriber("/target/observation", TargetObservations, self.observation_callback, queue_size=3)
+        self.observation_sub = rospy.Subscriber("/target/observation", TargetObservation, self.observation_callback, queue_size=3)
         self.rpy_pub = rospy.Publisher('/loco/command', Command, queue_size=3)
         self.cmd_msg = Command()
 	
@@ -134,14 +136,8 @@ class BBoxReactiveController(object):
         self.current_observation_mutex.acquire()
         self.current_observation = None
 
-        if msg.observations:
-            relevant_obs = [obs for obs in msg.observations]
-            
-            if relevant_obs:
-                assert (len(relevant_obs) == 1)
-                #assert (relevant_obs[0].target_visible)
-                if relevant_obs[0].target_visible:
-                    self.current_observation = relevant_obs[0]
+        if msg.target_visible: # only assign the current observation if there is something to observe
+            self.current_observation = msg
 
         if self.bbox_filter is None and self.current_observation:
             self.bbox_filter = BBoxFilter(self.current_observation.image_width, self.current_observation.image_height,
@@ -239,7 +235,7 @@ class BBoxReactiveController(object):
         self._acquire_all_mutexes()
         
         now = rospy.Time.now()
-        bbox_filter_is_active = (self.bbox_filter is not None and self.bbox_filter.is_initialized() 
+        bbox_filter_is_active = (self.bbox_filter is not None and self.bbox_filter.is_initialized()
 				     and self.bbox_filter.still_tracking(self.params_map['sec_before_giving_up']))
 
         if bbox_filter_is_active:
