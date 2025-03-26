@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>target_following</name>
+  <name>nauti_controls</name>
   <version>0.0.0</version>
-  <description>The target_following package</description>
+  <description>The NautiQuest PID controls package</description>
 
-  <maintainer email="islam034@umn.edu">aqua</maintainer>
+  <maintainer email="nautiquest80@gmail.com">nautiquest</maintainer>
   <license>GPLv3</license>
 
   <buildtool_depend>catkin</buildtool_depend>

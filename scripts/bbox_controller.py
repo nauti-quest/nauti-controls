@@ -19,9 +19,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import rospy
-from mini_pilot.msg import Command
+from nauti_pilot.msg import Command
 from std_msgs.msg import Float32
-from nauti_controls.msg import TargetObservation
+from nauti_controls.msg import BoundingBox
 
 from math import pi, sqrt, exp, log, tanh, cos, sin
 from threading import Lock
@@ -30,7 +30,7 @@ import numpy as np
 from pid import PID
 
 """
- Accept bbox as input (msg type TargetObservation)
+ Accept bbox as input (msg type BoundingBox)
  Issues (speed, yaw, pitch) commands for following it
  PID controller smooths the control outputs
 
@@ -40,7 +40,7 @@ from pid import PID
 	 -- Xahid 03.27.2018
 """
 # false positives avoidance - use probability
-OBJECTS_OF_INTEREST = {"traffic_cone", "belgian_gate"}
+OBJECTS_OF_INTEREST = {"person", "traffic_cone", "belgian_gate"}
 THRESHOLD = 0.6
 
 # Provides helper functions for BBox object
@@ -123,11 +123,11 @@ class BBoxReactiveController(object):
         
         self.rate = 20 
 
-        print ("Waiting for /target/observation to come up")
-        rospy.wait_for_message('/target/observation', TargetObservation)
-        print ("/target/observation has come up")
+        print ("Waiting for /detections to come up")
+        rospy.wait_for_message('/detections', BoundingBox)
+        print ("/detections has come up")
         
-        self.observation_sub = rospy.Subscriber("/target/observation", TargetObservation, self.observation_callback, queue_size=3)
+        self.observation_sub = rospy.Subscriber("/detections", BoundingBox, self.observation_callback, queue_size=3)
         self.rpy_pub = rospy.Publisher('/loco/command', Command, queue_size=3)
         self.cmd_msg = Command()
 	

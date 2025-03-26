@@ -1,3 +1,3 @@
 std_msgs/Header header
 
-target_following/TargetObservation[]  observations
+nauti_controls/TargetObservation[]  observations

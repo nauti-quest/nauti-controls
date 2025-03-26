@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(target_following)
+project(nauti_controls)
 
 
 find_package(OpenCV REQUIRED)
@@ -31,7 +31,9 @@ add_message_files(
 
 generate_messages(
    DEPENDENCIES
-   geometry_msgs   sensor_msgs   std_msgs
+   geometry_msgs   
+   sensor_msgs   
+   std_msgs
  )
 
 generate_dynamic_reconfigure_options(
@@ -43,7 +45,14 @@ generate_dynamic_reconfigure_options(
 
 catkin_package(
 #  LIBRARIES target_following
-   CATKIN_DEPENDS geometry_msgs roscpp rospy sensor_msgs std_msgs tf message_runtime
+   CATKIN_DEPENDS 
+   geometry_msgs 
+   roscpp 
+   rospy 
+   sensor_msgs 
+   std_msgs 
+   tf
+   message_runtime
 #  DEPENDS system_lib
 )
 
