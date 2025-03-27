@@ -24,6 +24,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 add_message_files(
    FILES
+   BoundingBox.msg
    TargetObservation.msg
    TargetObservations.msg 
    Params.msg
@@ -34,6 +35,7 @@ generate_messages(
    geometry_msgs   
    sensor_msgs   
    std_msgs
+   nauti_controls
  )
 
 generate_dynamic_reconfigure_options(

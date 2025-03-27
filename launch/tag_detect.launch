@@ -11,6 +11,6 @@
   </node>
  </group>
  
- <node pkg="target_following" type="artag_bbox_publisher.py" name="artag_bbox_publisher" />
+ <node pkg="nauti_controls" type="artag_bbox_publisher.py" name="artag_bbox_publisher" />
 
 </launch>

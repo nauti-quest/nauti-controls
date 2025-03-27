@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # This code is a part of the LoCO AUV project.
 # Copyright (C) The Regents of the University of Minnesota
@@ -84,20 +84,19 @@ class BBoxFilter(object):
         return self.state[0:4] * np.array([self.img_cols, self.img_rows, self.img_cols, self.img_rows])
     
     def update_estimate(self, measurement):
-        if measurement.target_visible:
-            self.last_measurement = measurement
-            self.last_measurement.header.stamp = rospy.Time.now()
-                
-            z = np.array([self.last_measurement.top_left_x / self.img_cols,
-                        self.last_measurement.top_left_y / self.img_rows,
-                        self.last_measurement.width / self.img_cols,
-                        self.last_measurement.height / self.img_rows]) 
-
-            if (not self.is_initialized()):
-                self.state[0:4] = z
-                return
+        self.last_measurement = measurement
+        self.last_measurement.header.stamp = rospy.Time.now()
             
-            self.state[0:4] = 0.*self.state[0:4] + 1.*z 
+        z = np.array([self.last_measurement.top_left_x / self.img_cols,
+                    self.last_measurement.top_left_y / self.img_rows,
+                    self.last_measurement.width / self.img_cols,
+                    self.last_measurement.height / self.img_rows]) 
+
+        if (not self.is_initialized()):
+            self.state[0:4] = z
+            return
+        
+        self.state[0:4] = 0.*self.state[0:4] + 1.*z 
         
         
 
@@ -136,7 +135,7 @@ class BBoxReactiveController(object):
         self.current_observation_mutex.acquire()
         self.current_observation = None
 
-        if msg.target_visible: # only assign the current observation if there is something to observe
+        if msg.class_name in OBJECTS_OF_INTEREST: # only assign the current observation if there is something to observe
             self.current_observation = msg
 
         if self.bbox_filter is None and self.current_observation:
@@ -203,8 +202,9 @@ class BBoxReactiveController(object):
         bbox_area = bbox_width * bbox_height
         image_area = self.bbox_filter.img_cols * self.bbox_filter.img_rows
 
-        error_bbox_size = self.params_map['target_bbox_image_ratio']*(1.0 - bbox_area/float(image_area)) 
-        error_bbox_size = max(0.0, error_bbox_size) # [0, target_bbox_im_ratio] \propoto distance
+        error_bbox_size = self.params_map['target_bbox_image_ratio'] * (1.0 - bbox_area/float(image_area)) 
+        print(error_bbox_size)
+        # error_bbox_size = max(0.0, error_bbox_size) # [0, target_bbox_im_ratio] \propoto distance
         
         error_forward = error_bbox_size
         return (error_forward, error_cols, error_rows)
@@ -237,6 +237,7 @@ class BBoxReactiveController(object):
         now = rospy.Time.now()
         bbox_filter_is_active = (self.bbox_filter is not None and self.bbox_filter.is_initialized()
 				     and self.bbox_filter.still_tracking(self.params_map['sec_before_giving_up']))
+        
 
         if bbox_filter_is_active:
             ss, yy, pp, rr, hh = 0, 0, 0, 0, 0
@@ -248,24 +249,25 @@ class BBoxReactiveController(object):
             self.heave_pid.update(error_heave, now.to_sec())
 
             if self.surge_pid.is_initialized(): # forward pseudospeed
-                ss = self._clip(self.surge_pid.control-self.params_map['target_bbox_image_ratio'], 0, 1)  
-                if ss <= self.params_map['deadzone_abs_vel_error']:
+                ss = self._clip(self.surge_pid.control-self.params_map['target_bbox_image_ratio'], -1, 1)  
+                print(self.surge_pid.control, " is the control for ss: ", ss)
+                if abs(ss) <= self.params_map['deadzone_abs_vel_error']:
                     ss = 0.0 
-        else: 
-            ss = self._clip(self.params_map['magnify_speed']*ss, 0, 1)  
+                else: 
+                    ss = self._clip(self.params_map['magnify_speed']*ss, -1, 1)  
 
-        if self.yaw_pid.is_initialized(): # yaw pseudospeed
-            yy = self._clip(self.yaw_pid.control, -1, 1)
-        if abs(yy) <= self.params_map['deadzone_abs_yaw_error']:
+            if self.yaw_pid.is_initialized(): # yaw pseudospeed
+                yy = self._clip(self.yaw_pid.control, -1, 1)
+                if abs(yy) <= self.params_map['deadzone_abs_yaw_error']:
                     yy = 0.0           
 
-        if self.heave_pid.is_initialized(): # pitch pseudospeed         
-            hh = self._clip(self.heave_pid.control, -1, 1) 
-        if abs(hh) <= self.params_map['deadzone_abs_pitch_error']:
-            hh = 0.0
+            if self.heave_pid.is_initialized(): # pitch pseudospeed         
+                hh = self._clip(self.heave_pid.control, -1, 1) 
+                if abs(hh) <= self.params_map['deadzone_abs_pitch_error']:
+                    hh = 0.0
 
             print ('V, yaw, heave : ', (ss, yy,  hh) )
-            self.set_vyprh_cmd(ss, yy, pp, rr, hh)
+            self.set_vyprh_cmd(ss, yy, pp, rr, -hh)
 
         else:
             print ('Target out of sight or statioanry')
