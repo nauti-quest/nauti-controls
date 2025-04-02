@@ -1,29 +1,9 @@
 #!/usr/bin/python3
 
-# This code is a part of the LoCO AUV project.
-# Copyright (C) The Regents of the University of Minnesota
-
-# Maintainer: Junaed Sattar <junaed@umn.edu> and the Interactive Robotics and Vision Laboratory
-
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 import rospy
 from nauti_pilot.msg import Command
-from std_msgs.msg import Float32
 from nauti_controls.msg import BoundingBox
 
-from math import pi, sqrt, exp, log, tanh, cos, sin
 from threading import Lock
 import numpy as np
 
@@ -107,7 +87,7 @@ class BBoxReactiveController(object):
 
         self.surge_pid = PID(kp=3, ki=0, deriv_prediction_dt=0.3, max_deriv_noise_gain=3) # surge
         self.heave_pid = PID(kp=3, ki=0, deriv_prediction_dt=0.3, max_deriv_noise_gain=3) # heave
-        self.yaw_pid = PID(kp=3, ki=0, deriv_prediction_dt=0.3, max_deriv_noise_gain=3) # yaw
+        self.yaw_pid = PID(kp=0.1, ki=0, deriv_prediction_dt=10, max_deriv_noise_gain=3) # yaw
         self.roll_pid = PID(kp=3, ki=0, deriv_prediction_dt=0.3, max_deriv_noise_gain=3) # roll
         self.sway_pid = PID(kp=3, ki=0, deriv_prediction_dt=0.3, max_deriv_noise_gain=3) # sway
         self.params_map = {}
@@ -170,7 +150,7 @@ class BBoxReactiveController(object):
         self.params_map['magnify_speed'] = rospy.get_param('~magnify_speed')
         self.params_map['deadzone_abs_vel_error'] = rospy.get_param('~deadzone_abs_vel_error')
         self.params_map['deadzone_abs_yaw_error'] = rospy.get_param('~deadzone_abs_yaw_error')
-        self.params_map['deadzone_abs_pitch_error'] = rospy.get_param('~deadzone_abs_pitch_error')
+        self.params_map['deadzone_abs_heave_error'] = rospy.get_param('~deadzone_abs_heave_error')
         self.params_map['target_bbox_image_ratio'] = rospy.get_param('~target_bbox_image_ratio')
         self.params_map['sec_before_giving_up'] = rospy.get_param('~sec_before_giving_up')
 
@@ -263,7 +243,7 @@ class BBoxReactiveController(object):
 
             if self.heave_pid.is_initialized(): # pitch pseudospeed         
                 hh = self._clip(self.heave_pid.control, -1, 1) 
-                if abs(hh) <= self.params_map['deadzone_abs_pitch_error']:
+                if abs(hh) <= self.params_map['deadzone_abs_heave_error']:
                     hh = 0.0
 
             print ('V, yaw, heave : ', (ss, yy,  hh) )
@@ -280,7 +260,7 @@ class BBoxReactiveController(object):
 
     def set_vyprh_cmd(self, ss, yy, pp, rr, hh):
         self.cmd_msg.throttle = ss+0.2
-        self.cmd_msg.yaw = yy
+        self.cmd_msg.yaw = -yy
         self.cmd_msg.pitch = pp
         self.cmd_msg.roll = rr
         self.cmd_msg.heave = hh

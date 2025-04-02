@@ -20,9 +20,9 @@ flat_roll_max_deriv_noise_gain: 1.0
 
 # Yaw error is measured in pixel distance from center column,
 # normalized by the width of the image 
-deadzone_abs_vel_error: 0.001
-deadzone_abs_yaw_error: 0.03                  
-deadzone_abs_pitch_error: 0.05
+deadzone_abs_vel_error: 0.1
+deadzone_abs_yaw_error: 0.05                  
+deadzone_abs_heave_error: 0.05
 target_bbox_image_ratio: 0.6
 
 magnify_speed: 1.0
