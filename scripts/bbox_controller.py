@@ -40,7 +40,7 @@ from pid import PID
 	 -- Xahid 03.27.2018
 """
 # false positives avoidance - use probability
-OBJECTS_OF_INTEREST = {"person", "traffic_cone", "belgian_gate"}
+OBJECTS_OF_INTEREST = {"person", "traffic_cone", "belgian_gate", "umbrella", "airplane"}
 THRESHOLD = 0.6
 
 # Provides helper functions for BBox object
