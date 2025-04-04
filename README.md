@@ -14,6 +14,6 @@ catkin build
 ## How to run
 - To run the bounding box navigation script, use the following command:
 ```bash
-roslaunch nauti_control bbox_controller.launch
+roslaunch nauti_controls bbox_controller.launch
 ```
-This would launch the bounding box node which would wait for
+This would launch the bounding box node which would wait for bounding box information from /detections topic
